@@ -274,6 +274,28 @@ def test_client_follows_cursor_until_has_more_false(httpx_mock):
     assert first.headers["Authorization"] == "Bearer k"
 
 
+def test_client_requests_max_page_size_unless_overridden(httpx_mock):
+    httpx_mock.add_response(json={"results": [], "has_more": False})
+    httpx_mock.add_response(json={"results": [], "has_more": False})
+    with _api_client() as client:
+        client.list_tool_call_logs()
+        client.list_tool_call_logs({"page_size": 50})
+    first, second = httpx_mock.get_requests()
+    assert first.url.params["page_size"] == "1000"
+    assert second.url.params["page_size"] == "50"
+
+
+def test_client_stops_when_cursor_repeats(httpx_mock):
+    for _ in range(2):
+        httpx_mock.add_response(
+            json={"results": [{"tool_name": "a"}], "has_more": True, "next_cursor": "same"}
+        )
+    with _api_client() as client:
+        out = client.list_tool_call_logs()
+    assert len(out) == 2  # page 1, then one re-fetch that returns "same" again ends the loop
+    assert len(httpx_mock.get_requests()) == 2
+
+
 def test_client_logs_http_error_carries_status(httpx_mock):
     httpx_mock.add_response(status_code=403, text="enterprise only")
     with _api_client() as client, pytest.raises(MergeClientError) as exc:
