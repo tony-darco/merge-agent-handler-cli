@@ -9,6 +9,7 @@ from merge_cli import __version__
 from merge_cli.commands.agent import agent
 from merge_cli.commands.authenticate import authenticate
 from merge_cli.commands.configure import configure
+from merge_cli.commands.eval import eval_cmd
 from merge_cli.commands.execute_tool import execute_tool
 from merge_cli.commands.get_tool_schema import get_tool_schema
 from merge_cli.commands.list_skills import list_skills
@@ -84,6 +85,8 @@ def main():
     maybe_check_for_update()
 
 
+## Tony addition to the merge agent handler api ##
+main.add_command(eval_cmd, "eval")
 main.add_command(search_tools, "search-tools")
 main.add_command(execute_tool, "execute-tool")
 main.add_command(list_tools, "list-tools")
