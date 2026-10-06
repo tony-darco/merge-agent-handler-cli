@@ -14,7 +14,7 @@ import io
 import json
 import re
 import sys
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 import click
 
@@ -53,6 +53,15 @@ def _safe_time(value: str | None) -> datetime | None:
         return parse_time(value) if value else None
     except ValueError:
         return None
+
+
+def count_unparseable(logs: list[dict]) -> int:
+    """Records whose `started_at` cannot be parsed, which a time filter silently drops."""
+    return sum(1 for log in logs if _safe_time(log.get("started_at")) is None)
+
+
+# The API only retains this many days of tool-call logs.
+RETENTION_DAYS = 30
 
 
 def filter_logs(
@@ -209,6 +218,12 @@ def logs_cmd(
             records = read_records(source.read())
         except (json.JSONDecodeError, csv.Error) as exc:
             raise click.ClickException(f"Could not parse log file: {exc}") from exc
+        if (since or until) and (skipped := count_unparseable(records)):
+            click.echo(
+                f"warning: {skipped} record(s) skipped by --since/--until because started_at "
+                "is not an ISO-8601 timestamp.",
+                err=True,
+            )
         records = filter_logs(
             records,
             tool=tool,
@@ -220,6 +235,14 @@ def logs_cmd(
             until=until,
         )
     else:
+        oldest = datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)
+        if since_dt and since_dt < oldest:
+            # The API clamps silently, so a short result would read as "nothing happened".
+            click.echo(
+                f"warning: --since is older than the API's {RETENTION_DAYS}-day log retention; "
+                f"results start no earlier than {oldest:%Y-%m-%d}.",
+                err=True,
+            )
         client, errors = get_client(
             api_key=api_key,
             tool_pack_id=tool_pack_id,
