@@ -12,6 +12,7 @@ from merge_cli.commands.configure import configure
 from merge_cli.commands.eval import eval_cmd
 from merge_cli.commands.execute_tool import execute_tool
 from merge_cli.commands.get_tool_schema import get_tool_schema
+from merge_cli.commands.lint import lint_cmd
 from merge_cli.commands.list_skills import list_skills
 from merge_cli.commands.list_tools import list_tools
 from merge_cli.commands.login import login
@@ -87,6 +88,7 @@ def main():
 
 ## Tony addition to the merge agent handler api ##
 main.add_command(eval_cmd, "eval")
+main.add_command(lint_cmd, "lint")
 main.add_command(search_tools, "search-tools")
 main.add_command(execute_tool, "execute-tool")
 main.add_command(list_tools, "list-tools")
