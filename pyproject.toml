@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "merge-api"
+version = "0.5.0"
+description = "CLI for Merge Agent Handler — search, discover, and execute thousands of tools"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "Merge", email = "support@merge.dev" }]
+keywords = ["merge", "cli", "agent-handler", "mcp", "tools"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "click>=8.0",
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+]
+
+[project.urls]
+Homepage = "https://merge.dev"
+Documentation = "https://docs.merge.dev/merge-agent-handler/implementation-guides/merge-cli"
+Repository = "https://github.com/merge-api/merge-cli"
+"Bug Tracker" = "https://github.com/merge-api/merge-cli/issues"
+Changelog = "https://github.com/merge-api/merge-cli/blob/main/CHANGELOG.md"
+
+[project.scripts]
+merge = "merge_cli.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-httpx>=0.30",
+    "ruff>=0.4",
+]
+
+[tool.setuptools.packages.find]
+include = ["merge_cli*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.ruff.lint.per-file-ignores]
+"evals/run_eval.py" = ["E501"]
+"merge_cli/commands/setup.py" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
