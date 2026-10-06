@@ -17,6 +17,7 @@ from merge_cli.commands.list_skills import list_skills
 from merge_cli.commands.list_tools import list_tools
 from merge_cli.commands.login import login
 from merge_cli.commands.logout import logout
+from merge_cli.commands.logs import logs_cmd
 from merge_cli.commands.publish_skill import publish_skill
 from merge_cli.commands.retrieve_skill import retrieve_skill
 from merge_cli.commands.search_tools import search_tools
@@ -89,6 +90,7 @@ def main():
 ## Tony addition to the merge agent handler api ##
 main.add_command(eval_cmd, "eval")
 main.add_command(lint_cmd, "lint")
+main.add_command(logs_cmd, "logs")
 main.add_command(search_tools, "search-tools")
 main.add_command(execute_tool, "execute-tool")
 main.add_command(list_tools, "list-tools")

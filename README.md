@@ -85,6 +85,7 @@ merge execute-tool slack__post_message '{"input": {"channel": "#general", "text"
 | `merge get-tool-schema <tool>` | Get the input schema for a specific tool |
 | `merge eval <dataset>` | Score tool selection for the cases in a JSONL dataset (precision, recall, F1, wrong-tool hits) |
 | `merge lint` | Scan the Tool Pack for destructive tools, overlapping descriptions and broad scope |
+| `merge logs [source]` | Show tool-call logs from the API, or filter a local JSON, JSONL or CSV file |
 | `merge login` | Log in via browser (OAuth) |
 | `merge logout` | Log out and clear OAuth tokens |
 | `merge configure` | Interactive API key setup (on deprecation path — use `merge login`) |

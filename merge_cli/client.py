@@ -273,6 +273,29 @@ class MergeClient:
         # key, so the default wouldn't fire and parse_tool_result would get None.
         return data.get("result") or {}
 
+    def list_tool_call_logs(self, params: dict | None = None) -> list[dict]:
+        """Fetch tool-call logs (GET /api/v1/logs/tool-calls/), following the cursor.
+
+        Results are oldest-first and cover the last 30 days; Enterprise plans only. Paging
+        stops when `has_more` is false, so narrow with `created_after` to avoid a full scan.
+        """
+        query = {k: v for k, v in (params or {}).items() if v is not None}
+        records: list[dict] = []
+        while True:
+            resp = self._http.get("/api/v1/logs/tool-calls/", params=query)
+            if resp.status_code != 200:
+                raise MergeClientError(
+                    f"Logs request failed: {resp.status_code} {resp.text}",
+                    status_code=resp.status_code,
+                )
+            data = resp.json()
+            if isinstance(data, list):
+                return records + data
+            records.extend(data.get("results") or data.get("data") or [])
+            if not data.get("has_more") or not data.get("next_cursor"):
+                return records
+            query["cursor"] = data["next_cursor"]
+
     def get_tool_schema(self, tool_name: str) -> dict | None:
         """Get the input schema for a single tool (filters from tools/list)."""
         tools = self.list_tools()
