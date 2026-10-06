@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import copy
 import json
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -26,6 +27,7 @@ from click.testing import CliRunner
 
 from merge_cli.client import MergeClient, MergeClientError
 from merge_cli.commands.logs import (
+    count_unparseable,
     filter_logs,
     format_log_line,
     group_by_turn,
@@ -369,3 +371,42 @@ def test_logs_cmd_bad_file_is_a_click_error(runner, tmp_path):
 def test_httpx_is_the_transport():
     # guards the pytest-httpx tests above against silently testing nothing
     assert hasattr(httpx, "Client")
+
+
+# ---------------------------------------------------------------------------
+# warnings (stderr)
+# ---------------------------------------------------------------------------
+
+
+def test_count_unparseable():
+    assert count_unparseable([_log(ts="2026-01-01T00:00:00Z"), _log(ts="01/02/2026"), {}]) == 2
+
+
+def test_logs_cmd_warns_when_time_filter_skips_unparseable_records(tmp_path):
+    path = tmp_path / "logs.json"
+    path.write_text(json.dumps([_log(ts="01/02/2026"), _log(ts="2026-01-01T00:00:00Z")]))
+    result = CliRunner().invoke(logs_cmd, [str(path), "--since", "2025-12-31"])
+    assert "1 record(s) skipped" in result.stderr
+    assert len(result.stdout.strip().splitlines()) == 1
+
+
+def test_logs_cmd_no_skip_warning_without_time_filter(tmp_path):
+    path = tmp_path / "logs.json"
+    path.write_text(json.dumps([_log(ts="01/02/2026")]))
+    result = CliRunner().invoke(logs_cmd, [str(path)])
+    assert result.stderr == ""
+
+
+def test_logs_cmd_warns_when_since_is_beyond_retention():
+    client = _client_with_logs([])
+    with patch("merge_cli.commands.logs.get_client", return_value=(client, [])):
+        result = CliRunner().invoke(logs_cmd, ["--since", "2020-01-01"])
+    assert "30-day" in result.stderr
+
+
+def test_logs_cmd_no_retention_warning_for_recent_since():
+    client = _client_with_logs([])
+    recent = datetime.now(timezone.utc).date().isoformat()
+    with patch("merge_cli.commands.logs.get_client", return_value=(client, [])):
+        result = CliRunner().invoke(logs_cmd, ["--since", recent])
+    assert result.stderr == ""
