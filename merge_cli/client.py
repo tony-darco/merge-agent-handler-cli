@@ -281,8 +281,20 @@ class MergeClient:
         """
         query = {k: v for k, v in (params or {}).items() if v is not None}
         records: list[dict] = []
+        refreshed = False
         while True:
             resp = self._http.get("/api/v1/logs/tool-calls/", params=query)
+            # Same recovery as _mcp_request: an expired OAuth token is refreshed and the
+            # request retried once. _try_refresh_token updates the client's Authorization
+            # header, so the retry goes out with the new token.
+            if resp.status_code == 401 and self._auth_mode == "oauth" and not refreshed:
+                refreshed = True
+                if not self._try_refresh_token():
+                    raise MergeClientError(
+                        "Session expired. Run `merge login` to re-authenticate.",
+                        status_code=401,
+                    )
+                continue
             if resp.status_code != 200:
                 raise MergeClientError(
                     f"Logs request failed: {resp.status_code} {resp.text}",

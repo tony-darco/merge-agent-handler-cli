@@ -369,3 +369,73 @@ def test_logs_cmd_bad_file_is_a_click_error(runner, tmp_path):
 def test_httpx_is_the_transport():
     # guards the pytest-httpx tests above against silently testing nothing
     assert hasattr(httpx, "Client")
+
+
+# ---------------------------------------------------------------------------
+# list_tool_call_logs: auth modes
+# ---------------------------------------------------------------------------
+
+
+def _oauth_client():
+    from merge_cli.config import OAuthConfig
+
+    cfg = OAuthConfig(
+        access_token="old", refresh_token="r1", client_id="cid", base_url="https://ah-api.merge.dev"
+    )
+    return MergeClient(oauth_config=cfg)
+
+
+def test_logs_oauth_bearer_token_is_sent(httpx_mock):
+    httpx_mock.add_response(json={"results": [{"tool_name": "a"}], "has_more": False})
+    with _oauth_client() as client:
+        assert client.list_tool_call_logs()[0]["tool_name"] == "a"
+    assert httpx_mock.get_requests()[0].headers["Authorization"] == "Bearer old"
+
+
+def test_logs_oauth_401_refreshes_token_and_retries_once(httpx_mock):
+    httpx_mock.add_response(status_code=401, text="expired")
+    httpx_mock.add_response(
+        url="https://ah-api.merge.dev/o/token/",
+        json={"access_token": "new", "refresh_token": "r2"},
+    )
+    httpx_mock.add_response(json={"results": [{"tool_name": "a"}], "has_more": False})
+
+    with patch("merge_cli.client.save_oauth_config") as save, _oauth_client() as client:
+        out = client.list_tool_call_logs()
+
+    assert [r["tool_name"] for r in out] == ["a"]
+    logs_requests = [r for r in httpx_mock.get_requests() if r.url.path.endswith("tool-calls/")]
+    assert [r.headers["Authorization"] for r in logs_requests] == ["Bearer old", "Bearer new"]
+    assert save.call_args.kwargs["access_token"] == "new"
+
+
+def test_logs_oauth_refresh_failure_asks_to_log_in_again(httpx_mock):
+    httpx_mock.add_response(status_code=401, text="expired")
+    httpx_mock.add_response(url="https://ah-api.merge.dev/o/token/", status_code=400)
+
+    with _oauth_client() as client, pytest.raises(MergeClientError) as exc:
+        client.list_tool_call_logs()
+
+    assert exc.value.status_code == 401
+    assert "merge login" in str(exc.value)
+
+
+def test_logs_oauth_second_401_after_refresh_is_not_retried_again(httpx_mock):
+    httpx_mock.add_response(status_code=401, text="expired")
+    httpx_mock.add_response(url="https://ah-api.merge.dev/o/token/", json={"access_token": "new"})
+    httpx_mock.add_response(status_code=401, text="still no")
+
+    with patch("merge_cli.client.save_oauth_config"), _oauth_client() as client:
+        with pytest.raises(MergeClientError) as exc:
+            client.list_tool_call_logs()
+
+    assert exc.value.status_code == 401
+    assert len(httpx_mock.get_requests()) == 3
+
+
+def test_logs_api_key_401_is_not_refreshed(httpx_mock):
+    httpx_mock.add_response(status_code=401, text="bad key")
+    with _api_client() as client, pytest.raises(MergeClientError) as exc:
+        client.list_tool_call_logs()
+    assert exc.value.status_code == 401
+    assert len(httpx_mock.get_requests()) == 1
