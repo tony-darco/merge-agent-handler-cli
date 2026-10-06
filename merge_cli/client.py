@@ -280,7 +280,10 @@ class MergeClient:
         stops when `has_more` is false, so narrow with `created_after` to avoid a full scan.
         """
         query = {k: v for k, v in (params or {}).items() if v is not None}
+        # Largest page the API allows; the default of 100 means ten times the round trips.
+        query.setdefault("page_size", 1000)
         records: list[dict] = []
+        seen_cursors: set[str] = set()
         refreshed = False
         while True:
             resp = self._http.get("/api/v1/logs/tool-calls/", params=query)
@@ -303,10 +306,13 @@ class MergeClient:
             data = resp.json()
             if isinstance(data, list):
                 return records + data
-            records.extend(data.get("results") or data.get("data") or [])
-            if not data.get("has_more") or not data.get("next_cursor"):
+            records.extend(data.get("results") or [])
+            cursor = data.get("next_cursor")
+            # A repeated cursor means the server is not advancing; stop rather than loop forever.
+            if not data.get("has_more") or not cursor or cursor in seen_cursors:
                 return records
-            query["cursor"] = data["next_cursor"]
+            seen_cursors.add(cursor)
+            query["cursor"] = cursor
 
     def get_tool_schema(self, tool_name: str) -> dict | None:
         """Get the input schema for a single tool (filters from tools/list)."""
